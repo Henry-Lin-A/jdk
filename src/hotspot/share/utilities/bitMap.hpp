@@ -331,6 +331,11 @@ class BitMap {
   // or end if none found.
   // precondition: beg and end form a valid range for the bitmap.
   idx_t find_first_set_bit(idx_t beg, idx_t end) const;
+  // write all indices in range to array
+  int find_first_n_set_bits(idx_t beg, idx_t end, uint32_t* results, int n) const;
+  // SIMD helper to get index using AVR512 instructions
+  inline int fast_byte_index(uint32_t *results, uint32_t start_idx, uint64_t bits) const;
+
   idx_t find_first_clear_bit(idx_t beg, idx_t end) const;
 
   idx_t find_first_set_bit(idx_t beg) const {

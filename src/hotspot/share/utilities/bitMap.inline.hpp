@@ -31,6 +31,7 @@
 #include "utilities/align.hpp"
 #include "utilities/count_trailing_zeros.hpp"
 #include "utilities/powerOfTwo.hpp"
+#include <x86intrin.h>
 
 inline void BitMap::set_bit(idx_t bit) {
   verify_index(bit);
@@ -281,6 +282,58 @@ inline BitMap::idx_t BitMap::find_last_bit_impl(idx_t beg, idx_t end) const {
 inline BitMap::idx_t
 BitMap::find_first_set_bit(idx_t beg, idx_t end) const {
   return find_first_bit_impl<find_ones_flip, false>(beg, end);
+}
+
+inline int BitMap::find_first_n_set_bits(idx_t beg, idx_t end, uint32_t* results, int n) const {
+  verify_range(beg, end);
+  int total = 0;
+
+  if (beg < end) {
+    idx_t index = to_words_align_down(beg);
+    idx_t initBit = bit_in_word(beg);
+    bm_word_t cword = flipped_word(index, 0) >> initBit;
+    total += fast_byte_index(results, 0, cword);
+    int count = 1;
+    idx_t limit = to_words_align_up(end);
+    while(total < n) {
+      if (++index < limit - 1) {
+        cword = flipped_word(index, 0);
+        total += fast_byte_index(results + total, 64 * count - initBit, cword);
+      } else {
+        // last word
+          cword = flipped_word(index, 0) & ~right_n_bits(bit_in_word(end));
+          return total + fast_byte_index(results + total, 64 * count - initBit, cword);
+      }
+      count++;
+    }
+  }
+  return total;
+}
+
+inline int BitMap::fast_byte_index(uint32_t *results, uint32_t start_idx, uint64_t bits) const {
+  __m512i indexes = _mm512_maskz_compress_epi8(bits, _mm512_set_epi32(
+    0x3f3e3d3c, 0x3b3a3938, 0x37363534, 0x33323130,
+    0x2f2e2d2c, 0x2b2a2928, 0x27262524, 0x23222120,
+    0x1f1e1d1c, 0x1b1a1918, 0x17161514, 0x13121110,
+    0x0f0e0d0c, 0x0b0a0908, 0x07060504, 0x03020100
+  ));
+  __m512i start = _mm512_set1_epi32(start_idx);
+  int count = __builtin_popcountll(bits);
+  __m512i t0 = _mm512_cvtepu8_epi32(_mm512_castsi512_si128(indexes));
+  _mm512_storeu_si512(results, _mm512_add_epi32(t0, start));
+  if (count > 16) {
+    __m512i t1 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(indexes, 1));
+    _mm512_storeu_si512(results + 16, _mm512_add_epi32(t1, start));
+    if (count > 32) {
+      __m512i t2 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(indexes, 2));
+      _mm512_storeu_si512(results + 32, _mm512_add_epi32(t2, start));
+      if (count > 48) {
+        __m512i t3 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(indexes, 3));
+        _mm512_storeu_si512(results + 48, _mm512_add_epi32(t3, start));
+      }
+    }
+  }
+  return count;
 }
 
 inline BitMap::idx_t
