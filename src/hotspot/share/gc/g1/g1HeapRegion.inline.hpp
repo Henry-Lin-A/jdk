@@ -26,7 +26,7 @@
 #define SHARE_GC_G1_G1HEAPREGION_INLINE_HPP
 
 #include "gc/g1/g1HeapRegion.hpp"
-
+#include <iostream>
 #include "classfile/vmClasses.hpp"
 #include "gc/g1/g1BlockOffsetTable.inline.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
@@ -162,13 +162,53 @@ inline void G1HeapRegion::reset_after_full_gc_common() {
   }
 }
 
+inline HeapWord* adapt(HeapWord* next_addr, HeapWord* limit,  uint32_t* found_addr, uint32_t* found, uint32_t* ptr, G1CMBitMap* bm, HeapWord** start){
+  while(true) {
+    if (*ptr < *found) {
+      if (bm->shift(found_addr[*ptr]) + *start >= next_addr) {
+        next_addr = bm->shift(found_addr[*ptr]) + *start;
+        return bm->shift(found_addr[(*ptr)++]) + *start;
+      } else {
+        (*ptr)++;
+      }
+
+    } else {
+      //refill
+      *start = next_addr;
+      *found = bm->get_next_n_addrs(next_addr, limit, found_addr, 200);
+      if (*found == 0) {
+        return limit;
+      }
+      *ptr = 0;
+    }
+  }
+}
+
 template<typename ApplyToMarkedClosure>
 inline void G1HeapRegion::apply_to_marked_objects(G1CMBitMap* bitmap, ApplyToMarkedClosure* closure) {
   HeapWord* limit = top();
   HeapWord* next_addr = bottom();
-
+  HeapWord* prefetchStart = next_addr;
+  uint32_t found_addr[265];
+  uint32_t found = 0;
+  uint32_t ptr = 0;
   while (next_addr < limit) {
-    Prefetch::write(next_addr, PrefetchScanIntervalInBytes);
+    // int found = bitmap -> get_next_n_addrs(next_addr, limit, found_addr, 200);
+    // assert(found < 265, "too many found objects");
+    // if (found == 0) {
+    //   next_addr = limit;
+    //   break;
+    // }
+
+    // for (int i = 0; i < MIN(found, 200); i++) {
+    //   // skip
+    //   if (bitmap->shift(found_addr[i]) + prefetchStart < next_addr) {
+    //     continue;
+    //   }
+    //   assert(bitmap->shift(found_addr[i]) + prefetchStart < limit, "must be");
+    //   oop current = cast_to_oop(bitmap->shift(found_addr[i]) + prefetchStart);
+    //   next_addr = bitmap->shift(found_addr[i]) + prefetchStart + closure->apply(current);
+    // }
     // This explicit is_marked check is a way to avoid
     // some extra work done by get_next_marked_addr for
     // the case where next_addr is marked.
@@ -176,7 +216,8 @@ inline void G1HeapRegion::apply_to_marked_objects(G1CMBitMap* bitmap, ApplyToMar
       oop current = cast_to_oop(next_addr);
       next_addr += closure->apply(current);
     } else {
-      next_addr = bitmap->get_next_marked_addr(next_addr, limit);
+      //next_addr = bitmap->get_next_marked_addr(next_addr, limit);
+      next_addr = adapt(next_addr, limit, found_addr, &found, &ptr, bitmap, &prefetchStart);
     }
   }
 

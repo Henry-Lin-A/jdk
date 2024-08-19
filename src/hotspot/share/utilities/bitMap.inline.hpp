@@ -294,15 +294,17 @@ inline int BitMap::find_first_n_set_bits(idx_t beg, idx_t end, uint32_t* results
     bm_word_t cword = flipped_word(index, 0) >> initBit;
     total += fast_byte_index(results, 0, cword);
     int count = 1;
-    idx_t limit = to_words_align_up(end);
+    idx_t limit = to_words_align_down(end);
     while(total < n) {
-      if (++index < limit - 1) {
+      if (++index < limit) {
         cword = flipped_word(index, 0);
         total += fast_byte_index(results + total, 64 * count - initBit, cword);
-      } else {
+      } else if (index == limit && bit_in_word(end)) {
         // last word
-          cword = flipped_word(index, 0) & ~right_n_bits(bit_in_word(end));
-          return total + fast_byte_index(results + total, 64 * count - initBit, cword);
+        cword = flipped_word(index, 0) & right_n_bits(bit_in_word(end));
+        return total + fast_byte_index(results + total, 64 * count - initBit, cword);
+      } else {
+        return total;
       }
       count++;
     }

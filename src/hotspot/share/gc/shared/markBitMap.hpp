@@ -93,6 +93,7 @@ public:
   inline void mark(oop obj);
   inline void clear(HeapWord* addr);
   inline void clear(oop obj);
+  inline size_t shift(size_t offset) const { return offset << _shifter; }
   inline bool par_mark(HeapWord* addr);
   inline bool par_mark(oop obj);
 
