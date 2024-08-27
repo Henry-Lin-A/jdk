@@ -50,16 +50,17 @@ public class JMap extends Tool {
     }
 
     protected String getCommandFlags() {
-        return "-heap|-heap:format=b[,gz=<1-9>][,file=<dumpfile>]|-heap:format=x[,file=<dumpfile>]|{-histo|-clstats|-finalizerinfo";
+        return "-heap|-heap:format=b[,gz=<1-9>][,redact][,file=<dumpfile>]|-heap:format=x[,file=<dumpfile>]|{-histo|-clstats|-finalizerinfo";
     }
 
     protected void printFlagsUsage() {
         System.out.println("    <no option>\tTo print same info as Solaris pmap.");
         System.out.println("    -heap\tTo print java heap summary.");
-        System.out.println("    -heap:format=b[,gz=<1-9>][,file=<dumpfile>]  \tTo dump java heap in hprof binary format.");
-        System.out.println("                                                 \tIf gz specified, the heap dump is written in gzipped format");
-        System.out.println("                                                 \tusing the given compression level.");
-        System.err.println("                                                 \t1 (recommended) is the fastest, 9 the strongest compression.");
+        System.out.println("    -heap:format=b[,gz=<1-9>][,file=<dumpfile>][,redact]\tTo dump java heap in hprof binary format.");
+        System.out.println("                                                        \tIf gz specified, the heap dump is written in gzipped format");
+        System.out.println("                                                        \tusing the given compression level.");
+        System.err.println("                                                        \t1 (recommended) is the fastest, 9 the strongest compression.");
+        System.out.println("                                                        \tIf redact is specified, primitive values will be written as 0.");
         System.out.println("    -heap:format=x[,file=<dumpfile>]             \tTo dump java heap in GXL format.");
         System.out.println("                                                 \tPlease be aware that \"gz\" option is not valid for heap dump in GXL format.");
         System.out.println("    -histo\tTo print histogram of java object heap.");
@@ -78,6 +79,7 @@ public class JMap extends Tool {
 
     private static String dumpfile = "heap.bin";
     private static int gzLevel = 0;
+    private static boolean redact = false;
 
     public void run() {
         Tool tool = null;
@@ -177,6 +179,8 @@ public class JMap extends Tool {
                                 System.err.println("compression level out of range (1-9): " + level);
                                 System.exit(1);
                             }
+                        } else if (keyValue[0].equals("redact")) {
+                            redact = true;
                         } else {
                             System.err.println("unknown option:" + keyValue[0]);
 
@@ -205,10 +209,8 @@ public class JMap extends Tool {
     public boolean writeHeapHprofBin(String fileName, int gzLevel) {
         try {
             HeapGraphWriter hgw;
-            if (gzLevel == 0) {
-                hgw = new HeapHprofBinWriter();
-            } else if (gzLevel >=1 && gzLevel <= 9) {
-                hgw = new HeapHprofBinWriter(gzLevel);
+            if (gzLevel >= 0 && gzLevel <= 9) {
+                hgw = new HeapHprofBinWriter(gzLevel, redact);
             } else {
                 System.err.println("Illegal compression level: " + gzLevel);
                 return false;

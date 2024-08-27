@@ -127,6 +127,7 @@ public class SALauncher {
         System.out.println("    --binaryheap            To dump java heap in hprof binary format.");
         System.out.println("    --dumpfile <name>       The name of the dump file. Only valid with --binaryheap.");
         System.out.println("    --gz <1-9>              The compression level for gzipped dump file. Only valid with --binaryheap.");
+        System.out.println("    --redact                To redact heap dump, by setting primitive values to 0.");
         System.out.println("    --histo                 To print histogram of java object heap.");
         System.out.println("    --clstats               To print class loader statistics.");
         System.out.println("    --finalizerinfo         To print information on objects awaiting finalization.");
@@ -312,6 +313,7 @@ public class SALauncher {
                 Map.entry("binaryheap", "binaryheap"),
                 Map.entry("dumpfile=", "dumpfile"),
                 Map.entry("gz=", "gz"),
+                Map.entry("redact", "redact"),
                 Map.entry("histo", "-histo"),
                 Map.entry("clstats", "-clstats"),
                 Map.entry("finalizerinfo", "-finalizerinfo"));
@@ -331,12 +333,16 @@ public class SALauncher {
             if (dumpfile != null) {
                 command += ",file=" + dumpfile;
             }
+            if (newArgMap.containsKey("redact")) {
+                command += ",redact";
+            }
             newArgMap.put(command, null);
         }
 
         newArgMap.remove("binaryheap");
         newArgMap.remove("dumpfile");
         newArgMap.remove("gz");
+        newArgMap.remove("redact");
         JMap.main(buildAttachArgs(newArgMap, false));
     }
 

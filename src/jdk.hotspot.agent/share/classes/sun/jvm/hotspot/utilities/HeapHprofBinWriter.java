@@ -386,6 +386,7 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
 
     private static final long MAX_U4_VALUE = 0xFFFFFFFFL;
     int serialNum = 1;
+    boolean redacted = false;
 
     public HeapHprofBinWriter() {
         this.KlassMap = new ArrayList<Klass>();
@@ -397,6 +398,13 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         this.KlassMap = new ArrayList<Klass>();
         this.names = new HashSet<Symbol>();
         this.gzLevel = gzLevel;
+    }
+
+    public HeapHprofBinWriter(int gzLevel, boolean redact){
+        this.KlassMap = new ArrayList<Klass>();
+        this.names = new HashSet<Symbol>();
+        this.gzLevel = gzLevel;
+        this.redacted = redact;
     }
 
     public synchronized void write(String fileName) throws IOException {
@@ -972,6 +980,10 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         out.writeInt(DUMMY_STACK_TRACE_ID);
         out.writeInt(length);
         out.writeByte((byte) type);
+        if (this.redacted) {
+            writeRedactedPrimitiveArray(type, array, length);
+            return;
+        }
         switch (type) {
             case TypeArrayKlass.T_BOOLEAN:
                 writeBooleanArray(array, length);
@@ -1000,6 +1012,58 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
             default:
                 throw new RuntimeException(
                     "Should not reach here: Unknown type: " + type);
+        }
+    }
+
+    private void writeRedactedPrimitiveArray(int type, TypeArray array, int length) throws IOException{
+        switch(type) {
+            case TypeArrayKlass.T_BOOLEAN:
+            case TypeArrayKlass.T_BYTE:
+                writeByteZeroArray(array, length);
+                break;
+            case TypeArrayKlass.T_CHAR:
+            case TypeArrayKlass.T_SHORT:
+                writeShortZeroArray(array, length);
+                break;
+            case TypeArrayKlass.T_INT:
+            case TypeArrayKlass.T_FLOAT:
+                writeIntZeroArray(array, length);
+                break;
+            case TypeArrayKlass.T_LONG:
+            case TypeArrayKlass.T_DOUBLE:
+                writeLongZeroArray(array, length);
+                break;
+            default:
+            throw new RuntimeException(
+                "Should not reach here: Unknown type: " + type);
+        }
+    }
+
+    // 1 byte
+    private void writeByteZeroArray(TypeArray array, int length) throws IOException {
+        for (int index = 0; index < length; index++) {
+            out.writeByte(0);
+        }
+    }
+
+    // 2 byte
+    private void writeShortZeroArray(TypeArray array, int length) throws IOException {
+        for (int index = 0; index < length; index++) {
+            out.writeShort(0);
+        }
+    }
+
+    // 4 byte
+    private void writeIntZeroArray(TypeArray array, int length) throws IOException {
+        for (int index = 0; index < length; index++) {
+            out.writeInt(0);
+        }
+    }
+
+    // 8 byte
+    private void writeLongZeroArray(TypeArray array, int length) throws IOException {
+        for (int index = 0; index < length; index++) {
+            out.writeLong(0);
         }
     }
 
@@ -1081,7 +1145,8 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         int size = cd.instSize;
         out.writeInt(size);
         for (Iterator<Field> itr = fields.iterator(); itr.hasNext();) {
-            writeField(itr.next(), instance);
+            if (this.redacted) writeRedactedField(itr.next(), instance);
+            else writeField(itr.next(), instance);
         }
     }
 
@@ -1100,7 +1165,8 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
             out.writeByte((byte)kind);
             if (ik != null) {
                 // static field
-                writeField(field, ik.getJavaMirror());
+                if (this.redacted) writeRedactedField(field, ik.getJavaMirror());
+                else writeField(field, ik.getJavaMirror());
             }
         }
     }
@@ -1157,6 +1223,49 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
             break;
         case JVM_SIGNATURE_DOUBLE:
             out.writeDouble(((DoubleField)field).getValue(oop));
+            break;
+        case JVM_SIGNATURE_CLASS:
+        case JVM_SIGNATURE_ARRAY: {
+            if (VM.getVM().isCompressedOopsEnabled()) {
+              OopHandle handle = ((NarrowOopField)field).getValueAsOopHandle(oop);
+              writeObjectID(getAddressValue(handle));
+            } else {
+              OopHandle handle = ((OopField)field).getValueAsOopHandle(oop);
+              writeObjectID(getAddressValue(handle));
+            }
+            break;
+        }
+        default:
+            throw new RuntimeException("should not reach here");
+        }
+    }
+
+    private void writeRedactedField(Field field, Oop oop) throws IOException {
+        char typeCode = (char) field.getSignature().getByteAt(0);
+        switch (typeCode) {
+        case JVM_SIGNATURE_BOOLEAN:
+            out.writeBoolean(false);
+            break;
+        case JVM_SIGNATURE_CHAR:
+            out.writeChar(0);
+            break;
+        case JVM_SIGNATURE_BYTE:
+            out.writeByte(0);
+            break;
+        case JVM_SIGNATURE_SHORT:
+            out.writeShort(0);
+            break;
+        case JVM_SIGNATURE_INT:
+            out.writeInt(0);
+            break;
+        case JVM_SIGNATURE_LONG:
+            out.writeLong(0);
+            break;
+        case JVM_SIGNATURE_FLOAT:
+            out.writeFloat(0);
+            break;
+        case JVM_SIGNATURE_DOUBLE:
+            out.writeDouble(0);
             break;
         case JVM_SIGNATURE_CLASS:
         case JVM_SIGNATURE_ARRAY: {
