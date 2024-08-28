@@ -389,18 +389,10 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
     boolean redacted = false;
 
     public HeapHprofBinWriter() {
-        this.KlassMap = new ArrayList<Klass>();
-        this.names = new HashSet<Symbol>();
-        this.gzLevel = 0;
+        this(0, false);
     }
 
-    public HeapHprofBinWriter(int gzLevel) {
-        this.KlassMap = new ArrayList<Klass>();
-        this.names = new HashSet<Symbol>();
-        this.gzLevel = gzLevel;
-    }
-
-    public HeapHprofBinWriter(int gzLevel, boolean redact){
+    public HeapHprofBinWriter(int gzLevel, boolean redact) {
         this.KlassMap = new ArrayList<Klass>();
         this.names = new HashSet<Symbol>();
         this.gzLevel = gzLevel;
@@ -980,8 +972,8 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         out.writeInt(DUMMY_STACK_TRACE_ID);
         out.writeInt(length);
         out.writeByte((byte) type);
-        if (this.redacted) {
-            writeRedactedPrimitiveArray(type, array, length);
+        if (redacted) {
+            writeRedactedPrimitiveArray(type, length);
             return;
         }
         switch (type) {
@@ -1015,53 +1007,53 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         }
     }
 
-    private void writeRedactedPrimitiveArray(int type, TypeArray array, int length) throws IOException{
-        switch(type) {
+    private void writeRedactedPrimitiveArray(int type, int length) throws IOException {
+        switch (type) {
             case TypeArrayKlass.T_BOOLEAN:
             case TypeArrayKlass.T_BYTE:
-                writeByteZeroArray(array, length);
+                writeByteZeroArray(length);
                 break;
             case TypeArrayKlass.T_CHAR:
             case TypeArrayKlass.T_SHORT:
-                writeShortZeroArray(array, length);
+                writeShortZeroArray(length);
                 break;
             case TypeArrayKlass.T_INT:
             case TypeArrayKlass.T_FLOAT:
-                writeIntZeroArray(array, length);
+                writeIntZeroArray(length);
                 break;
             case TypeArrayKlass.T_LONG:
             case TypeArrayKlass.T_DOUBLE:
-                writeLongZeroArray(array, length);
+                writeLongZeroArray(length);
                 break;
             default:
-            throw new RuntimeException(
-                "Should not reach here: Unknown type: " + type);
+                throw new RuntimeException(
+                        "Should not reach here: Unknown type: " + type);
         }
     }
 
     // 1 byte
-    private void writeByteZeroArray(TypeArray array, int length) throws IOException {
+    private void writeByteZeroArray(int length) throws IOException {
         for (int index = 0; index < length; index++) {
             out.writeByte(0);
         }
     }
 
     // 2 byte
-    private void writeShortZeroArray(TypeArray array, int length) throws IOException {
+    private void writeShortZeroArray(int length) throws IOException {
         for (int index = 0; index < length; index++) {
             out.writeShort(0);
         }
     }
 
     // 4 byte
-    private void writeIntZeroArray(TypeArray array, int length) throws IOException {
+    private void writeIntZeroArray(int length) throws IOException {
         for (int index = 0; index < length; index++) {
             out.writeInt(0);
         }
     }
 
     // 8 byte
-    private void writeLongZeroArray(TypeArray array, int length) throws IOException {
+    private void writeLongZeroArray(int length) throws IOException {
         for (int index = 0; index < length; index++) {
             out.writeLong(0);
         }
@@ -1145,8 +1137,12 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
         int size = cd.instSize;
         out.writeInt(size);
         for (Iterator<Field> itr = fields.iterator(); itr.hasNext();) {
-            if (this.redacted) writeRedactedField(itr.next(), instance);
-            else writeField(itr.next(), instance);
+            if (redacted) {
+                writeRedactedField(itr.next(), instance);
+            } else {
+                writeField(itr.next(), instance);
+            }
+
         }
     }
 
@@ -1165,8 +1161,11 @@ public class HeapHprofBinWriter extends AbstractHeapGraphWriter {
             out.writeByte((byte)kind);
             if (ik != null) {
                 // static field
-                if (this.redacted) writeRedactedField(field, ik.getJavaMirror());
-                else writeField(field, ik.getJavaMirror());
+                if (redacted) {
+                    writeRedactedField(field, ik.getJavaMirror());
+                } else {
+                    writeField(field, ik.getJavaMirror());
+                }
             }
         }
     }

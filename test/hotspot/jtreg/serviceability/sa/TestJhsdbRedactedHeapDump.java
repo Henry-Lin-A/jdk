@@ -16,15 +16,15 @@ import jdk.test.lib.hprof.parser.Reader;
 
 /**
  * @test
-* @library /test/lib
-* @requires vm.hasSA
-* @modules java.base/jdk.internal.misc
-*          jdk.hotspot.agent/sun.jvm.hotspot
-*          jdk.hotspot.agent/sun.jvm.hotspot.utilities
-*          jdk.hotspot.agent/sun.jvm.hotspot.oops
-*          jdk.hotspot.agent/sun.jvm.hotspot.debugger
-* @run driver TestJhsdbRedactedHeapDump
-*/
+ * @library /test/lib
+ * @requires vm.hasSA
+ * @modules java.base/jdk.internal.misc
+ *          jdk.hotspot.agent/sun.jvm.hotspot
+ *          jdk.hotspot.agent/sun.jvm.hotspot.utilities
+ *          jdk.hotspot.agent/sun.jvm.hotspot.oops
+ *          jdk.hotspot.agent/sun.jvm.hotspot.debugger
+ * @run driver TestJhsdbRedactedHeapDump
+ */
 
 class RedactedTestData {
     byte byteTest = 0x1;
@@ -60,7 +60,6 @@ class FieldLingeredApp extends LingeredApp {
         LingeredApp.main(args);
     }
 }
-
 
 public class TestJhsdbRedactedHeapDump {
     private static LingeredApp theApp = null;
@@ -141,7 +140,7 @@ public class TestJhsdbRedactedHeapDump {
         dump.delete();
     }
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         SATestUtils.skipIfCannotAttach();
         String heapDumpFileName = "redactedHeapDump.bin";
 
